@@ -1,0 +1,8 @@
+version: '3.4'
+
+services:
+  bayesiansystemmodeling:
+    image: bayesiansystemmodeling
+    build:
+      context: .
+      dockerfile: ./Dockerfile

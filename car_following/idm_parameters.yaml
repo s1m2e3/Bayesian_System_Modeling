@@ -1,0 +1,17 @@
+idm_parameters:
+  v0_lead: 30
+  v0_follow: 60
+  T_base: 0.1
+  s0: 1
+  a_base: 3
+  b: 5
+  delta: 4
+  n_simulations: 5
+  n_cars: 5
+  distance_vehicle: 20
+  t_min: 0
+  t_max: 100
+  t_step: 0.1
+  T_base : 0.1
+
+
