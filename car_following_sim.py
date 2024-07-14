@@ -1,22 +1,24 @@
-import scipy
-import numpy as np
-# import scipy
 import matplotlib.pyplot as plt
-# import car_following.idm_stochastic as idm_stochastic
-
 from car_following.idm import read_idm_ode_parameters,  idm_initial_conditions, solve_idm, plot_idm_results,find_accelerations
 from utils.diff_eq import simulation_params
+import numpy as np
+import pandas as pd
+from plotnine import ggplot, aes, geom_point 
 
-args = read_idm_ode_parameters()
-x0 = idm_initial_conditions(args[8], args[9], args[0])
-t_span,t_eval = simulation_params(args[10],args[11],args[12])
-for stochastic in [True, False]:
-    ode_args = (args[8],args[3],args[6],args[0],args[1],args[5],args[13],args[4],stochastic)
-    results_positions, results_velocities = solve_idm(args[8], args[7], t_span,t_eval, x0, ode_args)
-    accelerations = find_accelerations(args[7], args[8], results_velocities, t_span, t_eval)
-    fig, axes = plt.subplots(3, 1, sharex=True)
-    axes = plot_idm_results(axes,t_eval,results_positions,results_velocities,accelerations ,args[7], args[8],stochastic)
-
+v0_lead, v0_follow, T_base, s0, a_base, b, delta, n_simulations, n_cars,distance_vehicle,t_min,t_max,t_step = read_idm_ode_parameters()
+t_span,t_eval,num_step = simulation_params(t_min,t_max,t_step)
+x0 = idm_initial_conditions(n_cars,distance_vehicle,v0_lead)
+for stochastic in [False,True]:
+    idm_ode_args = (n_cars,s0,delta,v0_lead, v0_follow, b, T_base, a_base)                
+    T_factors, a_factors = np.random.uniform(0.8, 1.3, n_cars),np.random.uniform(0.8, 1.3, n_cars)
+    idm_ode_args = idm_ode_args + (T_factors, a_factors, stochastic)
+    results = solve_idm(n_simulations,t_span,t_eval, x0, idm_ode_args)
+    results = find_accelerations(results)
+    results_df = pd.concat([car.to_dataframe() for car in results], axis=0)
+    plot_idm_results(results_df)
+    # fig, axes = plt.subplots(3, 1, sharex=True)
+    # axes = plot_idm_results(axes,t_eval,results_positions,results_velocities,accelerations ,n_simulations, n_cars,stochastic)
+    # plt.show()
 # # import plotnine
 # # import ggplot
 # import pandas as pd
