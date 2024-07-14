@@ -10,7 +10,7 @@ idm_parameters:
   n_cars: 5
   distance_vehicle: 20
   t_min: 0
-  t_max: 100
+  t_max: 40
   t_step: 0.1
   T_base : 0.1
 

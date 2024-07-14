@@ -1,8 +1,8 @@
 import numpy as np
 from scipy.integrate import solve_ivp
 from data_types.data_types import IDMSimulation
-from plotnine import aes, geom_line
-from utils.plots_conf import get_line_colors
+from plotnine import aes, geom_line,geom_point ,labs
+from utils.plots_conf import get_color
 
 
 def read_idm_ode_parameters():
@@ -38,7 +38,7 @@ def acceleration(v, s,s0,delta ,delta_v, v0, T, a,b):
     return a * (1 - (v / v0) ** delta - (s_star / s) ** 2)
 
 # IDM ODE system
-def idm_ode(t, y, n_cars,s0,delta,v0_lead, v0_follow, b, T_base, a_base, T_factors, a_factors,stochastic):
+def idm_ode(t, y, n_cars,s0,delta,v0_lead, v0_follow, b, T_base, a_base,stochastic, T_factors, a_factors):
     dydt = np.zeros_like(y)
     for i in range(n_cars):
         x_i = y[2 * i]
@@ -53,6 +53,8 @@ def idm_ode(t, y, n_cars,s0,delta,v0_lead, v0_follow, b, T_base, a_base, T_facto
             s = x_front - x_i  # gap to the car in front
             delta_v = v_i - v_front  # speed difference
             v0 = v0_follow
+        # T = T_base * T_factors[i]*np.random.normal(1,0.2) if stochastic else T_base
+        # a = a_base * a_factors[i]*np.random.normal(1,0.2) if stochastic else a_base
         T = T_base * T_factors[i] if stochastic else T_base
         a = a_base * a_factors[i] if stochastic else a_base
         a_i = acceleration(v_i, s,s0,delta ,delta_v, v0, T, a,b)
@@ -61,18 +63,20 @@ def idm_ode(t, y, n_cars,s0,delta,v0_lead, v0_follow, b, T_base, a_base, T_facto
     return dydt
 
 # Running the simulations
-def solve_idm(n_simulations,t_span,t_eval, x0, args):
+def solve_idm(n_simulations,t_span,t_eval, x0 ,args):
     results = []
     n_cars = args[0]
     stochastic = args[-1]
-    if stochastic:
+    if not stochastic:
         n_simulations = 1
     for i in range(n_simulations):
+        T_factors, a_factors = np.random.uniform(0.8, 1.3, n_cars),np.random.uniform(0.8, 1.3, n_cars)
+        args = args + (T_factors, a_factors)
         sol = solve_ivp(idm_ode, t_span, x0, t_eval=t_eval, vectorized=True, args=(args))
         positions = sol.y[::2, :]
         velocities = sol.y[1::2, :]
         t = sol.t
-        
+        args = args[0:-2]
         for j in range(n_cars):
             y = np.column_stack((positions[j, :], velocities[j, :]))
             results.append(IDMSimulation(simulation_id=i, car_id=j, position=positions[j,:], velocity=velocities[j,:],t=t,y=y,stochastic=stochastic))
@@ -88,16 +92,30 @@ def find_accelerations(results):
 # Plotting function
 # # Plotting the results with each vehicle sharing colors across the simulations, excluding the first vehicle
 def plot_idm_results(data):
-    from utils.plots_conf import configure_line_plot
+    from utils.plots_conf import configure_plot, get_color
     import matplotlib.pyplot as plt
     data['car_id'] = data['car_id'].astype('category')
+    data['t'] = data['t'].astype('float')
+    for stochastic in data['stochastic'].unique():
+        data_stochastic = data[data['stochastic'] == stochastic]
+        for simulation in data_stochastic['simulation_id'].unique():
+            data_simulation = data_stochastic[data_stochastic['simulation_id'] == simulation]
+            for car in data_simulation['car_id'].unique():
+                data_car = data_simulation[data_simulation['car_id'] == car]
+                data_car['position'] = data_car['position'] - data_simulation[data_simulation['car_id']==0]['position']
+                data.loc[(data['simulation_id'] == simulation) & (data['stochastic'] == stochastic) & (data['car_id'] == car), :] = data_car
     ##Extract the deterministic plot 
+    data = data[data['car_id'] != 0]
     data_deterministic = data[data['stochastic'] == False]
-    plot = configure_line_plot()
-    plot = plot + geom_line(data=data_deterministic, mapping=aes(x='t', y='velocity', color='car_id'))
+    plot = configure_plot()
+    plot = plot + geom_line(data=data_deterministic,size=3, mapping=aes(x='t', y='position', color=('car_id')))
+    plot = get_color(plot)
+    plot = plot + labs(title='IDM Simulation: Distance to Leader Over Time (First 40 seconds)', x='Time (s)', y='Position (m)')
+    
+    data_not_deterministic = data[(data['stochastic'] == True)]
+    plot = plot + geom_point(data=data_not_deterministic,alpha=0.3 ,mapping=aes(x='t', y='position', color=('car_id')))
+    plot = get_color(plot)
     plot.show()
-    
-    
     
     # vehicle_colors = ['b', 'g', 'r', 'c']  # Only 4 colors needed for the following vehicles
     # for j in range(1, n_cars):

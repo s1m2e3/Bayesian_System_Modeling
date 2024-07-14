@@ -1,6 +1,6 @@
 from plotnine import ggplot, theme, element_blank,element_text, element_line, element_rect,theme, ggtitle,geom_line,labs,scale_fill_brewer,scale_color_brewer
 
-def configure_line_plot():
+def configure_plot():
     """
     Configures the plot with the given parameters:
     - Title with a font of 20 and bold text
@@ -31,7 +31,7 @@ def configure_line_plot():
      ) + ggtitle("Customized Plot Title")  # Set the plot title
     return plot
 
-def get_line_colors(plot,continuous=False):
+def get_color(plot,continuous=False):
     """
     Chooses the colors used in the plot given the number of categories for ggplot.
     If continuous=True, it generates a continuous color scale.
