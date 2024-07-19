@@ -82,6 +82,27 @@ def solve_idm(n_simulations,t_span,t_eval, x0 ,args):
             results.append(IDMSimulation(simulation_id=i, car_id=j, position=positions[j,:], velocity=velocities[j,:],t=t,y=y,stochastic=stochastic))
     return results
 
+def solve_idm_bayesian(n_simulations,t_span,t_eval, x0 ,args):
+    results = []
+    n_cars = args[0]
+    stochastic = args[-1]
+    if not stochastic:
+        n_simulations = 1
+    for i in range(n_simulations):
+        T_factors, a_factors = np.random.uniform(0.8, 1.3, n_cars),np.random.uniform(0.8, 1.3, n_cars)
+        args = args + (T_factors, a_factors)
+        sol = solve_ivp(idm_ode, t_span, x0, t_eval=t_eval, vectorized=True, args=(args))
+        positions = sol.y[::2, :]
+        velocities = sol.y[1::2, :]
+        t = sol.t
+        args = args[0:-2]
+        for j in range(n_cars):
+            y = np.column_stack((positions[j, :], velocities[j, :]))
+            results.append(IDMSimulation(simulation_id=i, car_id=j, position=positions[j,:], velocity=velocities[j,:],t=t,y=y,stochastic=stochastic))
+    return results
+
+
+
 
 def find_accelerations(results):
     # Calculate the accelerations for each simulation
@@ -94,8 +115,13 @@ def find_accelerations(results):
 def plot_idm_results(data):
     from utils.plots_conf import configure_plot, get_color
     import matplotlib.pyplot as plt
+    from plotnine import ylim,facet_wrap,theme
+    from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+
+    n_simulations = str(data['simulation_id'].astype(int).max()+1)
     data['car_id'] = data['car_id'].astype('category')
     data['t'] = data['t'].astype('float')
+    
     for stochastic in data['stochastic'].unique():
         data_stochastic = data[data['stochastic'] == stochastic]
         for simulation in data_stochastic['simulation_id'].unique():
@@ -104,19 +130,60 @@ def plot_idm_results(data):
                 data_car = data_simulation[data_simulation['car_id'] == car]
                 data_car['position'] = data_car['position'] - data_simulation[data_simulation['car_id']==0]['position']
                 data.loc[(data['simulation_id'] == simulation) & (data['stochastic'] == stochastic) & (data['car_id'] == car), :] = data_car
-    ##Extract the deterministic plot 
-    data = data[data['car_id'] != 0]
+    
     data_deterministic = data[data['stochastic'] == False]
-    plot = configure_plot()
-    plot = plot + geom_line(data=data_deterministic,size=3, mapping=aes(x='t', y='position', color=('car_id')))
-    plot = get_color(plot)
-    plot = plot + labs(title='IDM Simulation: Distance to Leader Over Time (First 40 seconds)', x='Time (s)', y='Position (m)')
-    
     data_not_deterministic = data[(data['stochastic'] == True)]
-    plot = plot + geom_point(data=data_not_deterministic,alpha=0.3 ,mapping=aes(x='t', y='position', color=('car_id')))
-    plot = get_color(plot)
-    plot.show()
+    data_not_deterministic['t'] = (data_not_deterministic['t']*3).astype('int')
+    data_not_deterministic = data_not_deterministic.drop_duplicates(subset=['t','car_id','simulation_id'], keep='first')
+    data_not_deterministic['t'] = data_not_deterministic['t']/3
     
+    
+    position_plot = configure_plot()
+    position_plot = position_plot + geom_line(data=data_deterministic,size=2, mapping=aes(x='t', y='position', color='car_id'),show_legend=True)+ theme(figure_size=(12, 5))
+    position_plot = position_plot + labs(title='IDM : Distance to Leader', x='Time (s)', y='Position (m)')
+    position_plot = get_color(position_plot)
+    position_deterministic_plot = position_plot
+    position_stochastic_plot = position_deterministic_plot + geom_point(data=data_not_deterministic,alpha=0.2 ,mapping=aes(x='t', y='position', color=('car_id')),show_legend=True)+labs(title='Stochastic IDM ('+n_simulations+' simulations) : Distance to Leader')
+    
+    velocity_plot = configure_plot()
+    velocity_plot = velocity_plot + geom_line(data=data_deterministic,size=2, mapping=aes(x='t', y='velocity', color='car_id'))+ theme(figure_size=(12, 5))
+    velocity_plot = get_color(velocity_plot)
+    velocity_plot = velocity_plot + labs(title='IDM : Velocity', x='Time (s)', y='Velocity (m/s)')
+    velocity_deterministic_plot = velocity_plot
+    velocity_stochastic_plot = velocity_deterministic_plot + geom_point(data=data_not_deterministic,alpha=0.2 ,mapping=aes(x='t', y='velocity', color=('car_id')))+labs(title='Stochastic IDM ('+n_simulations+' simulations) : Velocity')
+    
+    acceleration_plot = configure_plot()
+    acceleration_plot = acceleration_plot + geom_line(data=data_deterministic,size=2, mapping=aes(x='t', y='acceleration', color='car_id'))+ theme(figure_size=(12, 5))
+    acceleration_plot = get_color(acceleration_plot)
+    acceleration_plot = acceleration_plot + labs(title='IDM : Acceleration', x='Time (s)', y='Acceleration (m/s^2)')
+    acceleration_plot = acceleration_plot + ylim(-4,4)
+    acceleration_deterministic_plot = acceleration_plot
+    acceleration_stochastic_plot = acceleration_deterministic_plot + geom_point(data=data_not_deterministic,alpha=0.2 ,mapping=aes(x='t', y='acceleration', color=('car_id')))+labs(title='Stochastic IDM ('+n_simulations+' simulations) : Acceleration')
+    
+    # List of plots
+    plots = [position_deterministic_plot, position_stochastic_plot, velocity_deterministic_plot, velocity_stochastic_plot, acceleration_deterministic_plot, acceleration_stochastic_plot]
+
+    # Create a 3x2 grid of subplots
+    fig, axes = plt.subplots(3, 2, figsize=(20, 15), sharex='col', sharey='row')
+    
+    # Flatten the axes array for easy iteration
+    axes = axes.flatten()
+
+    # Render each plot to its respective axes
+    for ax, plot in zip(axes, plots):
+        # Create a FigureCanvas for each plot
+        canvas = FigureCanvas(plot.draw())
+        canvas.draw()
+        renderer = canvas.get_renderer()
+        ax.imshow(renderer.buffer_rgba())
+        ax.axis('off')  # Optionally turn off the axis
+
+    # Adjust layout
+    plt.tight_layout()
+
+    plt.savefig('./car_following/idm.png')
+    # Show the plot
+    # plt.show()
     # vehicle_colors = ['b', 'g', 'r', 'c']  # Only 4 colors needed for the following vehicles
     # for j in range(1, n_cars):
     #     for i in range(n_simulations):

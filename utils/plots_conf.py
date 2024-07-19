@@ -1,4 +1,4 @@
-from plotnine import ggplot, theme, element_blank,element_text, element_line, element_rect,theme, ggtitle,geom_line,labs,scale_fill_brewer,scale_color_brewer
+from plotnine import ggplot, theme, element_blank,element_text, element_line, element_rect,theme, ggtitle,geom_line,labs,scale_fill_brewer,scale_color_brewer,ylim
 
 def configure_plot():
     """
@@ -37,7 +37,7 @@ def get_color(plot,continuous=False):
     If continuous=True, it generates a continuous color scale.
     If continuous=False, it returns a discrete list of colors for categorical variables.
     """
-    if continuous:
+    if not continuous:
         plot = plot + scale_color_brewer(type='qual',palette='Dark2')
         return plot
     else:

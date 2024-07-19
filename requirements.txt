@@ -1,7 +1,11 @@
 # To ensure app dependencies are ported from your virtual environment/host machine into your container, run 'pip freeze > requirements.txt' in the terminal to overwrite this file
-pymc
+pymc==5.9.1
 numpyro
 blackjax
 nutpie
 ggplot
 plotnine
+# pytensor
+pymc
+arviz
+gpy
