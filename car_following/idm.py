@@ -1,4 +1,5 @@
 import numpy as np
+import yaml
 from scipy.integrate import solve_ivp
 from data_types.data_types import IDMSimulation
 from plotnine import aes, geom_line,geom_point ,labs
@@ -6,7 +7,7 @@ from utils.plots_conf import get_color
 
 
 def read_idm_ode_parameters():
-    import yaml
+    
     with open("car_following/idm_parameters.yaml", 'r') as file:
         data = yaml.safe_load(file)['idm_parameters']
     v0_lead = data['v0_lead']
